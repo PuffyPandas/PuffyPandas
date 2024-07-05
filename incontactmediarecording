@@ -1,0 +1,139 @@
+<apex:page controller="icAgentConsole.MediaRecordingController" title="{!$Label.icagentconsole__sfagentmediarecording}">
+    <script type="text/javascript" src="{!URLFOR($Resource.AgentConsoleApp, 'js/lib/jquery-3.5.0.min.js')}" />
+    <script type="text/javascript" src="{!URLFOR($Resource.AgentConsoleApp, 'js/lib/log4javascript.js')}" />
+    <script type="text/javascript" src="{!URLFOR($Resource.AgentConsoleApp, 'js/common/SessionStorageAppender.js')}" />
+    <script type="text/javascript" src="{!URLFOR($Resource.AgentConsoleApp, 'js/common/Util.js')}" />
+    <script type="text/javascript" src="{!URLFOR($Resource.AgentConsoleApp, 'js/common/AjaxHelper.js')}" />
+    <script type="text/javascript" src="{!URLFOR($Resource.AgentConsoleApp, 'js/data/AuthenticationDataStore.js')}" />
+    <apex:outputPanel rendered="{!IsLightningMode}">
+        <apex:stylesheet value="{!URLFOR($Resource.icAgentConsole__AgentConsoleApp,'css/lightning/salesforce-lightning-design-system-vf.min.css')}"
+        />
+        <apex:stylesheet value="{!URLFOR($Resource.icAgentConsole__AgentConsoleApp,'css/lightning/inContactAgentLightning.css')}" />
+        <apex:stylesheet value="{!URLFOR($Resource.icAgentConsole__AgentConsoleApp,'css/lightning/inContactEmailTranscriptLightning.css')}" />
+    </apex:outputPanel>
+    <apex:outputPanel rendered="{! $User.UIThemeDisplayed == 'Theme3' }">
+        <apex:stylesheet value="{!URLFOR($Resource.icAgentConsole__AgentConsoleApp,'css/inContactEmailTranscript.css')}" />
+    </apex:outputPanel>
+
+    <div class="icAgentconsole">
+
+
+        <!-- Recording View -->
+        <apex:form id="mediaRecording">
+            <apex:outputPanel id="recordingPanel" layout="block" rendered="true">
+                <apex:outputPanel id="recording">
+
+                    <!-- Header -->
+                    <div class="header">
+                        <div class="floating">
+                            <div class="title-panel">
+                                <div class="title">
+                                    <div class="primary">
+                                        <label>{!$Label.icagentconsole__sfagentmediarecording}</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Display page error messages like remotesitesettings error-->
+                    <apex:pageMessage rendered="{!len(pageErrorMessage)>0}" severity="error" strength="1" summary="{!pageErrorMessage}" />
+
+                    <div id="recording_pageBlock" class="forceRelatedListCardDesktop content bPageBlock brandSecondaryBrd apexDefaultPageBlock secondaryPalette remove-border">
+
+                        <!-- Action Status -->
+                        <apex:actionStatus id="status">
+                            <apex:facet name="start">
+                                <div class="slds-spinner_container">
+                                    <div class="slds-spinner--brand slds-spinner slds-spinner--large" role="alert">
+                                        <span class="slds-assistive-text"></span>
+                                        <div class="slds-spinner__dot-a"></div>
+                                        <div class="slds-spinner__dot-b"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="loading-layer" />
+                                    <div class="loading-panel">
+                                        <span class="loading-icn"></span>
+                                        <span class="loading-txt">{!$Label.processing}...</span>
+                                    </div>
+                                </div>
+                            </apex:facet>
+                            <apex:facet name="stop" />
+                        </apex:actionStatus>
+
+                        <!-- Error Block for Recording-->
+                        <div id="recordingUrlPanel" style="display:none">
+                            <apex:outputPanel >
+                                {!$Label.icagentconsole__recordingmsg} :
+                            </apex:outputPanel>
+                            <div>
+                                <apex:outputLink value="{!Recording}" id="recURL"> {!Recording}</apex:outputLink>
+                            </div>
+                        </div>
+                        <div id="recordingerror" class="recordingError" style="display:none" />
+
+
+                    </div>
+                </apex:outputPanel>
+            </apex:outputPanel>
+
+            <!-- Action Fnctions -->
+            <apex:actionFunction name="getRecordingURL" status="status" reRender="status,loginPanel,recording" action="{!getRecordingURL}"
+                oncomplete="loadmediaRecordingCompleted({! hasRecording})" />
+            <apex:actionfunction name="setOAuthInfo" action="{!setOAuthInfo}" rerender="" oncomplete="setOAuthInfoCompleted()">
+                <apex:param name="oAuthInfo" assignTo="{!oAuthInfo}" value="" />
+                <apex:param name="evolveUrl" assignTo="{!evolveUrl}" value="" />
+            </apex:actionfunction>
+        </apex:form>
+
+
+    </div>
+
+    <script type='text/javascript'>
+
+        // we must call jQuery.noConflict() otherwise the softphone will not get loaded.
+        var jQ = jQuery.noConflict(),
+            IC_mediaRecordingLocal = {
+                noRecording: "{!JSENCODE($Label.noRecording)}"
+            };
+
+        jQ(document).ready(function ($) {
+            if (AuthenticationDataStore.isTokenExpired() === true) {
+                AuthenticationDataStore.redirectToLoginPage(false);
+            }
+            var evolveUrl = AuthenticationDataStore.getEvolveWebServerUrl();
+            var oAuthInfo = AuthenticationDataStore.getOAuthInfo();
+            if (IC_Validation.isNotNullOrEmpty(oAuthInfo)) {
+                var oAuth2Token = {
+                    "access_token": oAuthInfo.accessToken,
+                    "expires_in": oAuthInfo.expiresIn,
+                    "refresh_token": oAuthInfo.refreshToken,
+                    "refresh_token_server_uri": oAuthInfo.refreshTokenUri,
+                    "resource_server_base_uri": oAuthInfo.baseUri,
+                    "evolve_url": evolveUrl
+                }
+                setOAuthInfo(JSON.stringify(oAuth2Token));
+            }
+
+        });
+
+        function setOAuthInfoCompleted() {
+            getRecordingURL();
+        }
+
+
+        function loadmediaRecordingCompleted(hasRecording) {
+            if (hasRecording == false) {
+                jQ("#recordingUrlPanel").hide();
+                jQ("#recordingerror").showfn();
+                jQ("#recordingerror").text(IC_mediaRecordingLocal.noRecording);
+            }
+            else {
+                jQ("#recordingerror").hide();
+                jQ("#recordingUrlPanel").showfn();
+            }
+        }
+
+    </script>
+</apex:page>
