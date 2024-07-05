@@ -1,0 +1,119 @@
+<!--
+ * File Name     : InContactSearchTerm
+ * Description   : 
+ * @author       : Nitin
+ *
+ * Modification Log
+ * =============================================================================
+ *   Ver     Date        Author                  Modification
+ * =============================================================================
+ *   1.0     26-Mar-2019   Nitin     Creation and Business Logic
+ -->
+
+<aura:component description="InContactSearchTerm" implements="flexipage:availableForAllPageTypes,lightning:actionOverride,force:appHostable,lightning:isUrlAddressable" access="global">
+    <aura:attribute name="searchTerm" type="String"/>
+    <aura:attribute name="pageReference" type="Object"/>
+    <aura:handler name="init" value="{!this}" action="{!c.init}"/>
+    <lightning:navigation aura:id="navService"/>
+    <lightning:workspaceAPI aura:id="workspace"/>
+        {!v.pageReference.state.testAttribute}
+</aura:component>
+
+
+
+
+
+
+({
+	init: function (component, event, helper) {
+		var workspaceAPI = component.find("workspace");
+		var url = window.location.href;
+		console.log(url);
+		var searchTerm = component.get("v.pageReference").state.c__searchTerm;
+		console.log(searchTerm);
+		if (typeof (searchTerm) !== 'undefined' && searchTerm !== '' && searchTerm != null) {
+			//var searchTerm = helper.getURLParameter('searchTerm');
+			console.log(searchTerm);
+			//searchTerm = decodeURIComponent((searchTerm + '').replace(/\+/g, '%20'));
+			console.log(searchTerm)
+			var jsonString = '{' +
+				'    "componentDef": "forceSearch:searchPage",' +
+				'    "attributes": {' +
+				'        "term": "' + searchTerm + '",' +
+				'        "scopeMap": {' +
+				'            "resultsCmp": "forceSearch:resultsTopResults",' +
+				'            "label": "Top Results",' +
+				'            "type": "TOP_RESULTS",' +
+				'            "cacheable": "Y",' +
+				'            "id": "TOP_RESULTS",' +
+				'            "labelPlural": "Top Results"' +
+				'        },' +
+				'        "context": {' +
+				'            "disableSpellCorrection": false,' +
+				'            "disableIntentQuery": false,' +
+				'            "permsAndPrefs": {' +
+				'                "OrgPermissions.UnionAppNavSmartScope": false,' +
+				'                "SearchUi.feedbackComponentEnabled": false,' +
+				'                "SearchUi.searchUIPilotFeatureEnabled": false,' +
+				'                "SearchExperience.LeftNavEnhancementEnabled": true,' +
+				'                "Search.crossObjectsAutoSuggestEnabled": true,' +
+				'                "Search.maskSearchInfoInLogs": false,' +
+				'                "SearchUi.orgHasAccessToSearchTermHistory": false,' +
+				'                "SearchResultsLVM.lvmEnabledForSearchResultsOn": true,' +
+				'                "SearchUi.searchUIInteractionLoggingEnabled": false,' +
+				'                "MySearch.userCanHaveMySearchBestResult": false,' +
+				'                "SearchResultsLVM.lvmEnabledForTopResults": false,' +
+				'                "MySearch.userCanHaveMySearch": false' +
+				'            }' +
+				'        },' +
+				'        "groupId": "DEFAULT"' +
+				'    },' +
+				'    "state": {}' +
+				'}';
+			var encodedString = window.btoa(jsonString);
+			workspaceAPI.getEnclosingTabId().then(function (response) {
+				workspaceAPI.openTab({
+					url: '/one/one.app#' + encodedString,
+					focus: true
+				});
+
+				var focusedTabId = response.tabId;
+				workspaceAPI.closeTab({tabId: focusedTabId});
+			})
+			.catch(function (error) {
+				console.log(error);
+			});
+		}/* else{
+			workspaceAPI.getEnclosingTabId().then(function (response) {
+				var focusedTabId = response.tabId;
+				workspaceAPI.closeTab({tabId: focusedTabId});
+			})
+			.catch(function (error) {
+				console.log(error);
+			});
+		}*/
+	}
+})
+
+
+
+
+
+
+
+
+({
+	getURLParameter: function (variable) {
+		console.log(window.location.href);
+		var query = window.location.search.substring(1);
+		console.log(query);
+		var vars = query.split("&");
+		for (var i = 0; i < vars.length; i++) {
+			var pair = vars[i].split("=");
+			if (pair[0] === variable) {
+				return pair[1];
+			}
+		}
+		return (false);
+	},
+})
