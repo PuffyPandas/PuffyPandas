@@ -1,0 +1,109 @@
+/*
+ * File Name     : InContact
+ * Description   : This class is called from the Case Research button on the Case page.
+ *          		This makes a web service callout to InContact which creates a work item in InContact
+ * @author       : Bhanuchandar Nedium
+ *
+ * Modification Log
+ * =============================================================================
+ *   Ver     Date        Author                  Modification
+ *------------------------------------------------------------------------------
+ *   1.0      04-Mar-2019   Bhanuchandar Nedium     Initial Creation
+ */
+public without sharing class InContact_LC {
+    
+    public class CaseUserWrapper {
+        @AuraEnabled
+        public User currentUser {get;set;}
+        @AuraEnabled
+        public Case currentCase {get;set;}  
+        public CaseUserWrapper(){
+            this.currentUser = new User();
+            this.currentCase = new Case();
+        }   
+    }
+    
+    @AuraEnabled 
+    public static CaseUserWrapper fetchCaseAndUserDetails(Id currentRecordId){
+        CaseUserWrapper obj = new CaseUserWrapper();
+        obj.currentUser = [select id, InContact_Agent_Id__c FROM User Where id =: userInfo.getUserId()];
+        obj.currentCase = [select id, OwnerId, Status FROM Case Where Id=:currentRecordId ];
+        return obj;
+    }
+    
+    @AuraEnabled 
+    public static RemoteResponse makeAPICall(Id caseId, User userRecord){
+        RemoteResponse objectResponse;
+        // InContactDetails - this custom settings stores the details required to make the callout
+        InContactDetails__c inContact = InContactDetails__c.getInstance('InContact');
+        HttpRequest req = new HttpRequest();
+        HttpResponse res = new HttpResponse();
+        Http http = new Http();
+        String AUTHORIZATION_HEADER = 'Authorization';
+        String AUTHORIZATION_BASIC_PREFIX = 'Basic ';
+        String AUTHORIZATION_BEARER_PREFIX = 'Bearer ';
+        String APPLICATION = inContact.Application_Name__c;
+        String VENDOR = inContact.Vendor_Name__c;
+        Integer BUSINESS_UNIT_ID = Integer.valueOf(inContact.Business_Unit_Id__c);
+        String TOKEN_AUTHORIZATION_HEADER_VALUE = AUTHORIZATION_BASIC_PREFIX + EncodingUtil.base64Encode(Blob.valueOf(APPLICATION + '@' + VENDOR + ':' + BUSINESS_UNIT_ID));
+        
+        JSONGenerator gen = JSON.createGenerator(true);
+        gen.writeStartObject();
+        gen.writeStringField('grant_type', 'password');
+        gen.writeStringField('username', inContact.UserName__c);
+        gen.writeStringField('password', inContact.Password__c);
+        
+        gen.writeEndObject();
+        
+        // Get the JSON string.
+        String pretty = gen.getAsString();
+        
+        req.setHeader(AUTHORIZATION_HEADER, TOKEN_AUTHORIZATION_HEADER_VALUE);
+        req.setHeader('content-type', 'application/json');
+        req.setHeader('Accept', 'application/json');            
+        req.setTimeout(12000);
+        req.setEndpoint(inContact.First_End_Point_URL__c);
+        req.setMethod('POST');
+        req.setBody(pretty);
+        // First callout to get the token, which will be used to make the callout to inContact service
+        res = http.send(req);
+        system.debug('res : ' +res.GetBody());
+        Map<String, Object> m = (Map<String, Object>)JSON.deserializeUntyped(res.GetBody());
+        system.debug(m.get('resource_server_base_uri'));
+        system.debug(m.keySet());
+        
+        req = new HttpRequest();
+        String SERVICES_PATH = 'services/'+'v8.0';
+        String API_PATH = '/interactions/work-items';
+        String API_QUERY = '?pointOfContact='+inContact.Point_of_Contact__c+'&workItemPayload={workItemPayload}';
+        String WORK_ITEM_PAYLOAD = '|'+userRecord.InContact_Agent_Id__c+'|Case|'+caseId+'|';
+        String API_URL = (SERVICES_PATH + API_PATH + API_QUERY).replace('{workItemPayload}', WORK_ITEM_PAYLOAD);
+        req.setHeader(AUTHORIZATION_HEADER, AUTHORIZATION_BEARER_PREFIX+m.get('access_token'));
+        req.setHeader('Accept', 'application/json');
+        req.setTimeout(12000);
+        req.setEndpoint(m.get('resource_server_base_uri')+API_URL);
+        req.setMethod('POST');
+        req.setBody('0');
+        system.debug('req ' +req);
+        // Second callout which connects with inContact web service
+        res = http.send(req);
+        system.debug('res body*** ' +res.GetBody());  
+        objectResponse = new RemoteResponse(true, res.getStatusCode(), res.getStatus());
+        return objectResponse;
+    }
+    
+    public class RemoteResponse{
+        @AuraEnabled
+        public Boolean isSuccess;
+        @AuraEnabled
+        public String message;
+        @AuraEnabled
+        public Integer statusCode;
+        
+        public RemoteResponse(Boolean isSuccess,Integer statusCode, String message) {
+            this.isSuccess = isSuccess;
+            this.message = message;
+            this.statusCode = statusCode;
+        }
+    }
+}
